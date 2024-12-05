@@ -42,16 +42,17 @@ static void logic(string fileName)
     cout << "\nProcessing updates" << endl;
 
     unsigned long middle_sum{ 0ul };
+    unsigned long middle_sum_corrected{ 0ul };
     for (string line; std::getline(input, line);) {
         cout << "." << std::flush; // Progress report
         vector<unsigned int> pages_in_update;
         bool update_valid = true;
 
         std::stringstream ss(line);
-        for (unsigned int page; (ss >> page) && update_valid; ss.ignore())
+        for (unsigned int page; (ss >> page); ss.ignore())
         {
             // PART 1: check if there are no pages preceding me that should be after me
-            update_valid = std::none_of(std::execution::par, std::cbegin(page_order_rules[page]), std::cend(page_order_rules[page]), [&](const auto later_page) {
+            update_valid &= std::none_of(std::execution::par, std::cbegin(page_order_rules[page]), std::cend(page_order_rules[page]), [&](const auto& later_page) {
                 return std::find(std::execution::par, std::cbegin(pages_in_update), std::cend(pages_in_update), later_page) != std::cend(pages_in_update);
             });
             pages_in_update.emplace_back(page);
@@ -60,7 +61,16 @@ static void logic(string fileName)
         {
             middle_sum += pages_in_update[pages_in_update.size() / 2];
         }
+        else
+        {
+            // PART 2: re-order the update according to the page rules
+            std::sort(std::begin(pages_in_update), std::end(pages_in_update), [&page_order_rules](const auto& left, const auto& right) {
+                return std::find(std::execution::par, std::cbegin(page_order_rules[left]), std::cend(page_order_rules[left]), right) != std::cend(page_order_rules[left]);
+            });
+            middle_sum_corrected += pages_in_update[pages_in_update.size() / 2];
+        }
     }
 
-    cout << "\nSum of middle pages of valid updates = " << middle_sum << endl;
+    cout << "\nSum of middle pages of valid updates = " << middle_sum
+         << "\nSum of middle pages of corrected updates = " << middle_sum_corrected << endl;
 }
