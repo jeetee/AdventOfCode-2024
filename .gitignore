@@ -33,3 +33,6 @@
 
 # Generated Files
 *.user
+*.vs
+build
+out
