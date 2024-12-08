@@ -36,3 +36,6 @@
 *.vs
 build
 out
+
+# AoC user specific inputs
+*-input.txt
