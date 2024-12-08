@@ -51,12 +51,12 @@ static void logic(string fileName)
         for (unsigned long long term; ss >> term;) {
             terms.emplace_back(term);
         }
-        if (evaluate_terms(possible_calibration_result, 0, std::cbegin(terms), std::cend(terms)))
+        if (evaluate_terms(possible_calibration_result, terms.front(), std::next(std::cbegin(terms)), std::cend(terms)))
         {// Real calibration result
             calibration_result += possible_calibration_result;
             calibration_result_2 += possible_calibration_result;
         }
-        else if (evaluate_terms_2(possible_calibration_result, 0, std::cbegin(terms), std::cend(terms)))
+        else if (evaluate_terms_2(possible_calibration_result, terms.front(), std::next(std::cbegin(terms)), std::cend(terms)))
         {
             calibration_result_2 += possible_calibration_result;
         }
