@@ -28,6 +28,8 @@ int main()
     cout << "Advent of Code 2024: 09\n";
     logic("09-example.txt"s);
     cout << endl;
+    logic("09-example-2.txt"s); // 2132
+    cout << endl;
     logic("09-input.txt"s);
     return 0;
 }
@@ -63,9 +65,12 @@ static void logic(string fileName)
             { // Skip gaps on the end
                 --right;
             }
-            // Swap & erase
-            disk_blocks[left] = disk_blocks[right];
-            disk_blocks[right] = -1;
+            if (left < right)
+            {
+                // Swap & erase
+                disk_blocks[left] = disk_blocks[right];
+                disk_blocks[right] = -1;
+            }
         }
     }
 
