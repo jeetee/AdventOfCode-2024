@@ -74,7 +74,7 @@ static void logic(string fileName)
         }
     }
 
-    unsigned long checksum{ 0 };
+    unsigned long long checksum{ 0 };
     for (size_t idx = 0; (idx < disk_blocks.size()) && (disk_blocks[idx] >= 0); ++idx) {
         checksum += idx * disk_blocks[idx];
     }
