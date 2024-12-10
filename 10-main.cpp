@@ -63,6 +63,7 @@ typedef struct Trail_Head_s
 {
     Point_t start;
     std::unordered_set<Point_t, PointClassHash> endings;
+    unsigned int rating{ 0 };
 } Trail_Head_t;
 
 static void logic(string fileName)
@@ -87,16 +88,16 @@ static void logic(string fileName)
         }
     }
 
-    // PART 1
+    // PART 1 + 2
     cout << "\nAnalysing " << trailheads.size() << " trail heads ";
     const int height{ static_cast<int>(lines.size()) };
     const int width{ static_cast<int>(lines.front().size()) };
     for (auto& trailhead : trailheads) {
         // BFS
         cout << '.' << std::flush; // Progress report
-        std::unordered_set<Point_t, PointClassHash> path_pos{ trailhead.start };
+        vector<Point_t> path_pos{ trailhead.start };
         do {
-            std::unordered_set<Point_t, PointClassHash> next_positions;
+            vector<Point_t> next_positions;
             for (auto& current_pos : path_pos) {
                 // Trace possible next positions for this path_pos entry
                 const char next_level = lines[current_pos.y][current_pos.x] + 1;
@@ -109,10 +110,11 @@ static void logic(string fileName)
                     {// This is a path continuation
                         if (next_level == PATH_END) {
                             trailhead.endings.emplace(newPos);
+                            trailhead.rating++;
                         }
                         else {
                             // Continue looking down this path
-                            next_positions.emplace(newPos);
+                            next_positions.emplace_back(newPos);
                         }
                     }
                 }
@@ -124,6 +126,10 @@ static void logic(string fileName)
     const size_t sum_of_trail_scores = std::accumulate(std::cbegin(trailheads), std::cend(trailheads), 0ull, [](size_t sum, const auto& trailhead) {
         return sum + trailhead.endings.size();
     });
+    const size_t sum_of_trail_ratings = std::accumulate(std::cbegin(trailheads), std::cend(trailheads), 0ull, [](size_t sum, const auto& trailhead) {
+        return sum + trailhead.rating;
+    });
 
-    cout << "\nSum of trail scores = " << sum_of_trail_scores << endl;
+    cout << "\nSum of trail scores = " << sum_of_trail_scores
+         << "\nSum of trail ratings = " << sum_of_trail_ratings << endl;
 }
