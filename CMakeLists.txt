@@ -14,6 +14,10 @@ add_executable(06 06-main.cpp 06-example.txt 06-input.txt)
 add_executable(07 07-main.cpp 07-example.txt 07-input.txt)
 add_executable(08 08-main.cpp 08-example.txt 08-input.txt)
 add_executable(09 09-main.cpp 09-example.txt 09-input.txt 09-example-2.txt)
+add_executable(10 10-main.cpp 10-example.txt 10-input.txt)
+
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/10-example.txt DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/10-input.txt DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/09-example.txt DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/09-input.txt DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
