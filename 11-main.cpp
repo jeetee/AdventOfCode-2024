@@ -60,7 +60,7 @@ static void logic(string fileName)
                 *stone = 1;
             }
             else if ((digits % 2) == 0) {
-                digits = pow(10, digits / 2);
+                digits = static_cast<unsigned int>(pow(10, digits / 2));
                 stones.emplace(stone, *stone / digits);
                 *stone %= digits;
             }
@@ -69,8 +69,41 @@ static void logic(string fileName)
             }
         }
     }
-
     cout << "\nNumber of stones after 25 blinks = " << stones.size() << endl;
+
+    // PART 2 - for a total of 75 blinks we'd run out of memory to brute force this.
+    // So we'd need a mathematical approach instead:
+    // - stones don't influence each other, so order is actually irrelevant
+    // - the number on a stone completely defines all future generations of it
+    // So we could track how many stones there are for each number and then run our logic on that instead
+    unordered_map<unsigned long long /*number on stone*/, unsigned long long /*count*/> stone_map;
+    // Build on top of PART 1's 25 iterations
+    for (auto& stone : stones) {
+        stone_map[stone]++;
+    }
+    cout << "Next 50 blinks using frequency map " << endl;
+    for (int blink = 50; blink --> 0;) {
+        cout << '.' << std::flush; // Progress report
+        unordered_map<unsigned long long /*number on stone*/, unsigned long long /*count*/> next_stone_map;
+        for (const auto& [stone, count] : stone_map) {
+            auto digits = num_digits(stone);
+            if (stone == 0) {
+                next_stone_map[1] += count;
+            }
+            else if((digits % 2) == 0) {
+                digits = static_cast<unsigned int>(pow(10, digits / 2));
+                next_stone_map[stone / digits] += count;
+                next_stone_map[stone % digits] += count;
+            }
+            else {
+                next_stone_map[stone * 2024ull] += count;
+            }
+        }
+        stone_map = next_stone_map;
+    }
+    cout << "\nNumber of stones after 75 blinks = " << std::accumulate(std::begin(stone_map), std::end(stone_map), 0ull, [](unsigned long long sum, const auto& stone_info) {
+            return sum + stone_info.second;
+        }) << endl;
 }
 
 static unsigned int num_digits(unsigned long long number)
