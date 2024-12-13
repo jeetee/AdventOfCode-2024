@@ -59,8 +59,8 @@ static void logic(string fileName)
         lines.emplace_back(line);
     }
 
-    // PART 1
-    unsigned long long total_fence_price{ 0 };
+    // PART 1 + 2
+    unsigned long long total_fence_price{ 0 }, total_fence_side_price{ 0 };
     const size_t height = lines.size();
     const size_t width = lines.front().size();
     for (size_t y = height; y --> 0;) {
@@ -73,14 +73,17 @@ static void logic(string fileName)
             const char current_region_processed = current_region - 'A' + 'a';
             unsigned int area{ 0 }, perimeter{ 0 };
             unordered_set<std::pair<size_t, size_t>, SizeTPairHasher> area_points_to_inspect{ std::make_pair(x, y) };
+            enum DirIdx { LEFT = 0, RIGHT = 1, UP = 2, DOWN = 3 };
+            std::array<unordered_map<size_t/*DirPosIdx*/, vector<size_t/*OtherDirPos*/>>, 4/*DirIdx*/> fences;
             do {
                 const auto& current_point = *(area_points_to_inspect.begin());
                 ++area;
                 lines[current_point.second][current_point.first] = current_region_processed; // Prevent double processing of this position
 
                 // Check fence and/or area expansion
-                const vector<std::pair<size_t, size_t>> neighbors{ { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } };
-                for (const auto& [xOffset, yOffset] : neighbors) {
+                const std::array<std::pair<size_t, size_t>, 4> neighbors{{ { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 } }}; // Matches DirIdx
+                for (size_t directionIdx = neighbors.size(); directionIdx --> 0;) {
+                    const auto& [xOffset, yOffset] = neighbors[directionIdx];
                     const auto next_pos_x = current_point.first + xOffset;
                     const auto next_pos_y = current_point.second + yOffset;
 
@@ -88,6 +91,8 @@ static void logic(string fileName)
                         || ((lines[next_pos_y][next_pos_x] != current_region) && (lines[next_pos_y][next_pos_x] != current_region_processed))
                         ) { // Out of bounds or not the same region --> fence
                         ++perimeter;
+                        const bool vertical = (directionIdx == DirIdx::UP) || (directionIdx == DirIdx::DOWN);
+                        fences[directionIdx][vertical ? current_point.second : current_point.first].emplace_back(vertical ? current_point.first : current_point.second);
                     }
                     else {
                         // Same region
@@ -101,8 +106,32 @@ static void logic(string fileName)
             } while (!area_points_to_inspect.empty());
 
             total_fence_price += static_cast<unsigned long long>(area) * perimeter;
+
+            // Count fences, by counting all discontinuous fences
+            // So first sort them to ensure we can detect a continuous fence
+            unsigned int fence_count{ 0 };
+            for (size_t directionIdx = fences.size(); directionIdx-- > 0;) {
+                for (auto& [_, coords] : fences[directionIdx]) {
+                    std::sort(std::execution::par, std::begin(coords), std::end(coords));
+                    auto fence = std::cbegin(coords);
+                    auto fence_pos = *fence;
+                    do {
+                        ++fence_count;
+                        // Follow this fence
+                        do {
+                            fence_pos = *fence;
+                            ++fence;
+                        } while ((fence != std::cend(coords))
+                            && (*fence == fence_pos + 1)
+                        );
+                    } while (fence != std::cend(coords));
+                }
+            }
+
+            total_fence_side_price += static_cast<unsigned long long>(area) * fence_count;
         }
     }
 
-    cout << "\nTotal fence price = " << total_fence_price << endl;
+    cout << "\nTotal fence price (perimeter) = " << total_fence_price
+        << "\nTotal fence price (sides) = " << total_fence_side_price << endl;
 }
