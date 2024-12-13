@@ -34,8 +34,8 @@ struct Button_s {
 };
 
 struct Point_s {
-    size_t x;
-    size_t y;
+    long long x;
+    long long y;
 };
 
 class Machine
@@ -47,7 +47,7 @@ private:
 public:
     Machine(std::istream& input);
     
-    [[nodiscard]] unsigned long CalculateMinimalPrizeCost() const noexcept;
+    [[nodiscard]] unsigned long long CalculateMinimalPrizeCost(long long prizeOffset = 0) const noexcept;
 };
 
 int main()
@@ -83,7 +83,13 @@ static void logic(string fileName)
         return sum + machine.CalculateMinimalPrizeCost();
     });
 
-    cout << "\nTotal fence price = " << total_cost << endl;
+    // PART 2
+    unsigned long long total_cost_offset = std::accumulate(std::cbegin(machines), std::cend(machines), 0ull, [](unsigned long long sum, const auto& machine) {
+        return sum + machine.CalculateMinimalPrizeCost(10000000000000ll);
+    });
+
+    cout << "\nTotal minimal cost = " << total_cost
+        << "\nTotal cost for prizes offset by 10000000000000 " << total_cost_offset << endl;
 }
 
 Machine::Machine(std::istream& input)
@@ -104,7 +110,7 @@ Machine::Machine(std::istream& input)
     input >> _Prize.y;
 }
 
-unsigned long Machine::CalculateMinimalPrizeCost() const noexcept
+unsigned long long Machine::CalculateMinimalPrizeCost(long long prizeOffset/* = 0*/) const noexcept
 {
     // We need to find out how many button presses of A and B are required to reach the Prize
     // This provides us with the following system of equations to solve:
@@ -123,14 +129,14 @@ unsigned long Machine::CalculateMinimalPrizeCost() const noexcept
     if (B_denominator == 0) { // Can't reach prize
         return 0;
     }
-    const auto B_nominator = (_A.yOffset * static_cast<long>(_Prize.x)) - (_A.xOffset * static_cast<long>(_Prize.y));
+    const auto B_nominator = (_A.yOffset * (_Prize.x + prizeOffset)) - (_A.xOffset * (_Prize.y + prizeOffset));
     const auto B = B_nominator / B_denominator;
     // Ensure B was a clean division
     if (B * B_denominator != B_nominator) {
         return 0; // Can't reach prize with button presses
     }
 
-    const long A_nominator = static_cast<long>(_Prize.x) - (B * static_cast<long>(_B.xOffset));
+    const auto A_nominator = (_Prize.x + prizeOffset) - (B * _B.xOffset);
     const auto A = A_nominator / _A.xOffset;
     // Ensure A was a clean division
     if (A * _A.xOffset != A_nominator) {
@@ -142,5 +148,5 @@ unsigned long Machine::CalculateMinimalPrizeCost() const noexcept
     }
 
     // Found A & B number of presses
-    return static_cast<unsigned long>(A) * _A.cost + static_cast<unsigned long>(B) * _B.cost;
+    return static_cast<unsigned long long>(A) * _A.cost + static_cast<unsigned long long>(B) * _B.cost;
 }
