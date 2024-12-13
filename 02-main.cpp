@@ -108,38 +108,13 @@ static bool is_report_dampened_safe(string line)
         const auto interval_dir = DirectionFromDifference(*interval_1);
         const auto interval_2 = (std::next(interval_1));
 
-        if (   (   (interval_dir == Direction::ASCENDING)
-                && (*interval_1 > 3)
-                )
-            || (   (interval_dir == Direction::DESCENDING)
-                && (*interval_1 < -3)
-                )
-            || (interval_dir == Direction::FLAT)
-            )
-        { // interval_1 range is invalid
-            if (!dampened)
-            { // Adjust next interval to assimilate this one
-                dampened = true;
-                if (interval_2 != std::end(intervals))
-                {
-                    *interval_2 += *interval_1;
-                }
-                continue;
-            }
-            else
-            {
-                return false;
-            }
-        }
-        // interval_1 value range is valid
-
         if (interval_2 != std::end(intervals) && (interval_dir != DirectionFromDifference(*interval_2)))
         { // Different direction
             if (!dampened)
             { // Possible fixes: remove 1st level of first interval, remove level between both intervals, remove last level of 2nd interval
                 std::stringstream line_with_first_level_removed, line_with_middle_level_removed, line_with_last_level_removed;
                 const size_t first_level_idx_to_remove = std::distance(std::begin(intervals), interval_1);
-                for (size_t level_idx = 0; level_idx < levels.size(); ++level_idx)
+                for (size_t level_idx = (first_level_idx_to_remove > 0) ? (first_level_idx_to_remove - 1) : 0; level_idx < levels.size(); ++level_idx)
                 {
                     if (level_idx != first_level_idx_to_remove)
                     {
@@ -164,6 +139,41 @@ static bool is_report_dampened_safe(string line)
                 return false;
             }
         }
+        // Both intervals have the same direction
+
+        if (interval_dir == Direction::FLAT)
+        { // Can't fix two FLATs in a row
+            return false;
+        }
+
+        if (  ((interval_dir == Direction::ASCENDING)
+                && (*interval_1 > 3)
+                )
+            || ((interval_dir == Direction::DESCENDING)
+                && (*interval_1 < -3)
+                )
+            )
+        { // Interval too large and direction of interval is equal
+            if (dampened)
+            {
+                return false;
+            }
+
+            // ==> Assimilating the interval will only lead to a bigger interval
+            // This can only be fixed if the interval is either the first or the last one
+            if (   (interval_1 == std::begin(intervals))
+                || (interval_2 == std::end(intervals))
+                )
+            { // Ignore this interval (this means either "removing" the first level or the last level of a report
+                dampened = true;
+                continue;
+            }
+            else
+            { // Removing a level will lead to an even bigger interval
+                return false;
+            }
+        }
+        // interval_1 value range is valid
     }
 
     return true;
