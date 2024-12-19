@@ -37,7 +37,7 @@ int main()
     return 0;
 }
 
-static bool can_make_design(const string& design, const vector<string>&towels);
+static size_t can_make_design(const string& design, const vector<string>&towels);
 
 static void logic(string fileName)
 {
@@ -55,25 +55,31 @@ static void logic(string fileName)
     }
     input.ignore(); // Skip empty separator line
 
-    // PART 1
+    // PART 1 + 2
     cout << "Processing Designs ";
     unsigned int possible_design_count{ 0 };
+    size_t possible_design_count_ways{ 0 };
     for (string design; std::getline(input, design);) {
         cout << '.' << std::flush; // Progress indication
-        if (can_make_design(design, towels)) {
+        const auto design_count = can_make_design(design, towels);
+        if (design_count > 0) {
             ++possible_design_count;
+            possible_design_count_ways += design_count;
         }
     }
 
-    cout << "\nNumber of possible designs = " << possible_design_count << endl;
+    cout << "\nNumber of possible designs = " << possible_design_count
+         << "\nNumber of ways to achieve them = " << possible_design_count_ways << endl;
 }
 
-static bool can_make_design(const string& design, const vector<string>& towels)
+static size_t can_make_design(const string& design, const vector<string>& towels)
 {
     // A design can be made if we can progressively make each subpart with a towel and reach the end of the design with an exact size match.
-    std::unordered_set<size_t> idxs_to_check{ 0 };
+    size_t number_of_ways{ 0 };
+    std::unordered_map<size_t/*idx*/, size_t/*ways_to_reach_idx*/> idxs_to_check{ {0, 1} };
     while (!idxs_to_check.empty()) {
-        auto idx_to_start = *(idxs_to_check.cbegin());
+        // Process from low to high, ensuring all paths to an index are counted
+        auto [idx_to_start, count] = *(idxs_to_check.cbegin());
         idxs_to_check.erase(idx_to_start);
 
         for (const string& towel : towels) {
@@ -84,13 +90,15 @@ static bool can_make_design(const string& design, const vector<string>& towels)
             if (design.substr(idx_to_start, towel.size()) == towel) {
                 if (next_idx == design.size()) {
                     // Exact match on total length as well -> found a combo that works
-                    return true;
+                    number_of_ways += count;
                 }
-                idxs_to_check.insert(next_idx);
+                else {
+                    idxs_to_check[next_idx] += count;
+                }
             }
             // else: no match on this towel
         }
     }
-    // Did not find a match
-    return false;
+
+    return number_of_ways;
 }
