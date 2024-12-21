@@ -53,6 +53,15 @@ struct Position {
         return !(*this == p);
     }
 };
+struct PositionHasher
+{
+    std::size_t operator()(const Position& p) const
+    {
+        std::stringstream ss;
+        ss << p.x << '|' << p.y;
+        return std::hash<string>{}(ss.str());
+    }
+};
 
 enum class Direction {
     UP, DOWN, LEFT, RIGHT
@@ -136,6 +145,20 @@ struct StepHasher
     }
 };
 
+struct StepNode {
+    Step step;
+    vector<StepNode> previous_step; // More than one route could lead to the same step at the same cost
+};
+struct StepNodeHasher
+{
+    std::size_t operator()(const StepNode& sn) const
+    {
+        std::stringstream ss;
+        ss << sn.step.pos.x << '|' << sn.step.pos.y << '|' << sn.step.dir;
+        return std::hash<string>{}(ss.str());
+    }
+};
+
 static void logic(string fileName)
 {
     static constexpr char WALL = '#';
@@ -163,16 +186,16 @@ static void logic(string fileName)
         }
     }
 
-    // PART 1
+    // PART 1 + 2
     cout << "\nSolving ";
-    std::multimap<unsigned long long /*cost*/, Step> steps_to_process{{
-        { 0, start },
+    std::multimap<unsigned long long /*cost*/, StepNode> steps_to_process{{
+        { 0, { start } },
     }};
     unordered_map<Step, unsigned long long /*cost*/, StepHasher> minimal_cost_to_step{{
         { start, 0 },
     }};
 
-    while (!steps_to_process.empty() && (steps_to_process.cbegin()->second.pos != end)) {
+    while (!steps_to_process.empty() && (steps_to_process.cbegin()->second.step.pos != end)) {
         cout << '.' << std::flush; // Progress indication
 
         // Continue from current cheapest path, check directions we can move to
@@ -180,11 +203,11 @@ static void logic(string fileName)
         static const std::array<Direction, 4> directions = { Direction::UP, Direction::DOWN, Direction::LEFT, Direction::RIGHT };
 
         for (const Direction& dir : directions) {
-            size_t rotations_needed = n_rotations_for(current_step_handle.mapped().dir, dir);
+            size_t rotations_needed = n_rotations_for(current_step_handle.mapped().step.dir, dir);
             // 1000 point per rotation, 1 point for a step in the same direction
             const auto resulting_step_cost = current_step_handle.key() + ((rotations_needed != 0) ? (rotations_needed * 1000) : 1);
             
-            Step next_step = current_step_handle.mapped();
+            Step next_step = current_step_handle.mapped().step;
             switch (dir) {
                 case Direction::UP:    next_step.pos.y--; break;
                 case Direction::DOWN:  next_step.pos.y++; break;
@@ -196,7 +219,7 @@ static void logic(string fileName)
                 && (maze[next_step.pos.y][next_step.pos.x] != WALL)
                 )
             { // Valid position for next_step
-                auto resulting_step = (rotations_needed == 0) ? next_step : current_step_handle.mapped();
+                auto resulting_step = (rotations_needed == 0) ? next_step : current_step_handle.mapped().step;
                 resulting_step.dir = dir; // No-op in case of no rotation
                 // Evaluate cost to resulting position
                 auto current_min_cost = minimal_cost_to_step[resulting_step];
@@ -207,13 +230,17 @@ static void logic(string fileName)
                     auto possible_next_step_entries_by_cost = steps_to_process.equal_range(current_min_cost);
                     auto step_it = std::find_if(std::execution::par,
                         possible_next_step_entries_by_cost.first, possible_next_step_entries_by_cost.second, [&resulting_step](const auto& step_to_process) {
-                            return (step_to_process.second == resulting_step);
+                            return (step_to_process.second.step == resulting_step);
                         }
                     );
                     if (step_it != possible_next_step_entries_by_cost.second) {
-                        auto resulting_step_handle = steps_to_process.extract(step_it);
-                        resulting_step_handle.key() = resulting_step_cost;
-                        steps_to_process.insert(std::move(resulting_step_handle));
+                        auto resulting_stepnode_handle = steps_to_process.extract(step_it);
+                        resulting_stepnode_handle.key() = resulting_step_cost;
+                        // Our new path to here is cheaper than the existing ones, update this information
+                        resulting_stepnode_handle.mapped().previous_step = {
+                            current_step_handle.mapped()
+                        };
+                        steps_to_process.insert(std::move(resulting_stepnode_handle));
                     }
                     else {
                         throw new std::domain_error("Failed to locate existing route while trying to register a cheaper version of it"s);
@@ -222,13 +249,37 @@ static void logic(string fileName)
                 else if ((current_min_cost == 0) && (resulting_step != start)) {
                     // New map entry, didn't exist yet
                     minimal_cost_to_step[resulting_step] = resulting_step_cost;
-                    steps_to_process.insert(std::make_pair(resulting_step_cost, resulting_step));
+                    steps_to_process.insert(std::make_pair(resulting_step_cost, StepNode{ resulting_step, { current_step_handle.mapped() } }));
                 }
-                // else -> found, but new path costs the same or more, abandon it
+                else if (current_min_cost == resulting_step_cost) {
+                    // Different path to resulting node with same cost, add it to the correct step_to_process
+                    auto possible_next_step_entries_by_cost = steps_to_process.equal_range(current_min_cost);
+                    auto step_it = std::find_if(std::execution::par,
+                        possible_next_step_entries_by_cost.first, possible_next_step_entries_by_cost.second, [&resulting_step](const auto& step_to_process) {
+                            return (step_to_process.second.step == resulting_step);
+                        }
+                    );
+                    if (step_it != possible_next_step_entries_by_cost.second) {
+                        step_it->second.previous_step.emplace_back(current_step_handle.mapped());
+                    }
+                    else {
+                        throw new std::domain_error("Failed to locate existing route while trying to register a cheaper version of it"s);
+                    }
+                }
+                // else -> found, but new path costs more, abandon it
             }
             // else -> invalid position, abandon
         }
     }
 
     cout << "\nMinimal cost to reach the exit = " << steps_to_process.cbegin()->first << endl;
+    unordered_set<Position, PositionHasher> best_path_tiles;
+    std::function<void(const StepNode&)> AddStepNodePositionToSet = [&best_path_tiles, &AddStepNodePositionToSet](const StepNode& stepnode) {
+        best_path_tiles.insert(stepnode.step.pos);
+        for (const auto& from : stepnode.previous_step) {
+            AddStepNodePositionToSet(from);
+        }
+    };
+    AddStepNodePositionToSet(steps_to_process.cbegin()->second);
+    cout << "Number of tiles part of any optimal path = " << best_path_tiles.size() << endl;
 }
