@@ -25,10 +25,15 @@ add_executable(17 17-main.cpp 17-example.txt 17-input.txt)
 add_executable(19 19-main.cpp 19-example.txt 19-input.txt)
 add_executable(21 21-main.cpp 21-example.txt 21-input.txt)
 add_executable(22 22-main.cpp 22-example.txt 22-input.txt 22-example-2.txt)
+add_executable(24 24-main.cpp 24-example.txt 24-input.txt 24-example-2.txt)
 add_executable(25 25-main.cpp 25-example.txt 25-input.txt)
 
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/25-example.txt DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/25-input.txt DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/24-example.txt DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/24-input.txt DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/24-example-2.txt DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/22-example.txt DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/22-input.txt DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
