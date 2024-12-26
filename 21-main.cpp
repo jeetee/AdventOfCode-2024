@@ -53,16 +53,32 @@ private:
 public:
     Keypad(vector<string> keypad);
     void Reset();
-    string MoveTo(char key);
+    std::pair<string, string> MoveTo(char key);
 };
 
-string get_button_sequence(string buttons, Keypad& keypad)
+static vector<string> get_shortest_button_sequences(string buttons, Keypad& keypad)
 {
-    string sequence{};
+    vector<string> sequences{ ""s };
     for (char button : buttons) {
-        sequence += keypad.MoveTo(button) + 'A';
+        auto buttonSeqs = keypad.MoveTo(button);
+        if (!buttonSeqs.second.empty()) {
+            auto dupSequences = sequences;
+            std::for_each(std::execution::par, std::begin(dupSequences), std::end(dupSequences), [&buttonSeqs](auto& seq) {
+                seq += buttonSeqs.second + 'A';
+            });
+            std::for_each(std::execution::par, std::begin(sequences), std::end(sequences), [&buttonSeqs](auto& seq) {
+                seq += buttonSeqs.first + 'A';
+            });
+            sequences.insert(std::end(sequences), std::begin(dupSequences), std::end(dupSequences));
+        }
+        else {
+            // Only one sequence returned, append it
+            std::for_each(std::execution::par, std::begin(sequences), std::end(sequences), [&buttonSeqs](auto& seq) {
+                seq += buttonSeqs.first + 'A';
+            });
+        }
     }
-    return sequence;
+    return sequences;
 }
 
 static void logic(string fileName)
@@ -83,22 +99,46 @@ static void logic(string fileName)
     std::ifstream input(fileName);
     for (string line; std::getline(input, line);) {
         numpad.Reset();
-        string depressurized_robot = get_button_sequence(line, numpad);
-        dirpad.Reset();
-        string radiation_robot = get_button_sequence(depressurized_robot, dirpad);
-        dirpad.Reset();
-        string negative_temp_robot = get_button_sequence(radiation_robot, dirpad);
+        vector<string> depressurized_robot = get_shortest_button_sequences(line, numpad);
+
+        vector<string> radiation_robot;
+        for (auto& seq : depressurized_robot) {
+            dirpad.Reset();
+            auto seqs = get_shortest_button_sequences(seq, dirpad);
+            if (radiation_robot.empty() || (seqs.front().size() < radiation_robot.front().size())) {
+                radiation_robot.clear();
+                radiation_robot = seqs;
+            }
+            else if (seqs.front().size() == radiation_robot.front().size()) {
+                radiation_robot.insert(std::end(radiation_robot), std::begin(seqs), std::end(seqs));
+            }
+            // else resulting sequences are longer than those we already had for this level
+        }
+        
+        vector<string> negative_temp_robot;
+        for (auto& seq : radiation_robot) {
+            dirpad.Reset();
+            auto seqs = get_shortest_button_sequences(seq, dirpad);
+            if (negative_temp_robot.empty() || (seqs.front().size() < negative_temp_robot.front().size())) {
+                negative_temp_robot.clear();
+                negative_temp_robot = seqs;
+            }
+            else if (seqs.front().size() == negative_temp_robot.front().size()) {
+                negative_temp_robot.insert(std::end(negative_temp_robot), std::begin(seqs), std::end(seqs));
+            }
+            // else resulting sequences are longer than those we already had for this level
+        }
 
         cout << line << ":\n"
-             << depressurized_robot << "\n"
-             << radiation_robot << "\n"
-             << negative_temp_robot << endl;
+             << depressurized_robot.front() << "\n"
+             << radiation_robot.front() << "\n"
+             << negative_temp_robot.front() << endl;
 
         unsigned long long complexity;
         // Extract numeric value
         std::stringstream ss(line);
         ss >> complexity;
-        complexity_sum += complexity * negative_temp_robot.size();
+        complexity_sum += complexity * negative_temp_robot.front().size();
     }
 
     cout << "\nComplexity Sum = " << complexity_sum << endl;
@@ -125,7 +165,7 @@ void Keypad::Reset()
     current_pos = initial_pos;
 }
 
-string Keypad::MoveTo(char key)
+std::pair<string, string> Keypad::MoveTo(char key)
 {
     Position target{};
     for (int y = static_cast<int>(pad.size()); y-- > 0;) {
@@ -136,30 +176,42 @@ string Keypad::MoveTo(char key)
         }
     }
 
-    std::stringstream moves;
-    char moveY = (target.y > current_pos.y) ? 'v' : '^';
-    char moveX = (target.x > current_pos.x) ? '>' : '<';
-    if (target.x == gap.x) {
-        // Move Y first, to avoid crossing gap
-        for (int diffY = abs(target.y - current_pos.y); diffY --> 0;) {
-            moves << moveY;
-        }
-        // Then move X
-        for (int diffX = abs(target.x - current_pos.x); diffX --> 0;) {
-            moves << moveX;
-        }
+    std::pair<string, string> moves{ ""s, ""s };
+    std::stringstream xmoves, ymoves;
+    const char moveX = (target.x > current_pos.x) ? '>' : '<';
+    const char moveY = (target.y > current_pos.y) ? 'v' : '^';
+    for (int diffX = abs(target.x - current_pos.x); diffX-- > 0;) {
+        xmoves << moveX;
+    }
+    for (int diffY = abs(target.y - current_pos.y); diffY-- > 0;) {
+        ymoves << moveY;
+    }
+    if ((xmoves.tellp() == 0) || (ymoves.tellp() == 0)) {
+        // Only moving in one direction, order thus is irrelevant
+        moves.first = xmoves.str() + ymoves.str();
+    }
+    else if ((target.x == gap.x)
+        && (((gap.y >= current_pos.y) && (gap.y <= target.y))
+            || ((gap.y >= target.y) && (gap.y <= current_pos.y))
+            )
+        )
+    { // Move Y first, to avoid crossing gap
+        moves.first = ymoves.str() + xmoves.str();
+    }
+    else if ((target.y == gap.y)
+        && (((gap.x >= current_pos.x) && (gap.x <= target.x))
+            || ((gap.x >= target.x) && (gap.x <= current_pos.x))
+            )
+        )
+    { // Move X first, to avoid crossing gap
+        moves.first = xmoves.str() + ymoves.str();
     }
     else {
-        // Move X first, to avoid crossing gap
-        for (int diffX = abs(target.x - current_pos.x); diffX-- > 0;) {
-            moves << moveX;
-        }
-        // Then move Y
-        for (int diffY = abs(target.y - current_pos.y); diffY-- > 0;) {
-            moves << moveY;
-        }
+        // Order of movement is irrelevant for this level of movement
+        moves.first = xmoves.str() + ymoves.str();
+        moves.second = ymoves.str() + xmoves.str();
     }
 
     current_pos = target;
-    return moves.str();
+    return moves;
 }
